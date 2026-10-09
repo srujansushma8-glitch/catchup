@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Catchup Dashboard: local-first chat triage</title>
+<meta name="description" content="Sign in to a private on-device dashboard that summarizes unread chats, ranks what needs you, and tracks deadlines. Chats are encrypted on your device and hidden by default.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F1F3F8;--ink:#101828;--mute:#5A6678;--card:#fff;--line:#DDE2EC;--brand:#5B3FF2;--onbrand:#fff;--red:#D92D43;--amber:#A35F00;--green:#0C8A57;--chip:#ECEFF6;--redbg:#FDECEF;--okbg:#E1F5EA;--warnbg:#FFF1D6;--nav:#0F1B33;--navtx:#C9D3E6}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0A101D;--ink:#E9EEF8;--mute:#9AA9C0;--card:#131D31;--line:#25344D;--brand:#8E7BFF;--onbrand:#0A0F1E;--red:#FF7487;--amber:#F2B955;--green:#5FDDAA;--chip:#1C2A42;--redbg:#3A1822;--okbg:#0F2F22;--warnbg:#3A2B0B;--nav:#070C17}}
+:root[data-theme="dark"]{--bg:#0A101D;--ink:#E9EEF8;--mute:#9AA9C0;--card:#131D31;--line:#25344D;--brand:#8E7BFF;--onbrand:#0A0F1E;--red:#FF7487;--amber:#F2B955;--green:#5FDDAA;--chip:#1C2A42;--redbg:#3A1822;--okbg:#0F2F22;--warnbg:#3A2B0B;--nav:#070C17}
+*{box-sizing:border-box}[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 'Manrope',system-ui,sans-serif}
+h1,h2,h3{margin:0;letter-spacing:-.02em;font-weight:800}
+h1{font-size:30px}h2{font-size:18px;margin:22px 0 10px}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+button{font:inherit;font-weight:700;border-radius:10px;padding:10px 16px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.pri{background:var(--brand);border-color:var(--brand);color:var(--onbrand)}
+button.danger{border-color:var(--red);color:var(--red)}
+input[type=text],input[type=password],input[type=file],select{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px;font:inherit;background:var(--card);color:var(--ink)}
+textarea{width:100%;height:120px;border:1.5px solid var(--line);border-radius:10px;padding:10px;font:13px monospace;background:var(--card);color:var(--ink);-webkit-text-security:disc}
+label{display:block;font-weight:700;font-size:14px;margin:14px 0 5px}
+.pill{border-radius:99px;padding:4px 11px;font-size:12.5px;font-weight:700;border:1.5px solid;white-space:nowrap}
+.pill.ok{color:var(--green);border-color:var(--green);background:var(--okbg)}.pill.warn{color:var(--amber);border-color:var(--amber);background:var(--warnbg)}
+.sub,.hint,small{color:var(--mute)}.hint{font-size:13px;margin:6px 0 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+/* auth */
+.auth{min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr}
+@media(max-width:860px){.auth{grid-template-columns:1fr}}
+.pitch{background:var(--nav);color:#fff;padding:48px 44px;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.pitch h1{font-size:clamp(34px,4.6vw,52px);line-height:1.04}
+.pitch p{color:var(--navtx);max-width:46ch;margin:0}
+.pitch ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.pitch li{padding-left:28px;position:relative;color:#fff}.pitch li::before{content:"✓";position:absolute;left:0;color:#8CF0C0;font-weight:800}
+.logo{font-weight:800;font-size:22px}
+.gate{display:grid;place-items:center;padding:30px 20px}
+.gate .box{width:100%;max-width:400px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+.err{color:var(--red);font-weight:600;min-height:22px;margin:8px 0 0}
+/* shell */
+.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+@media(max-width:860px){.shell{grid-template-columns:1fr}}
+aside{background:var(--nav);color:var(--navtx);padding:20px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px}
+@media(max-width:860px){aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px}.sp,.who{display:none}}
+aside .logo{color:#fff;padding:0 10px 14px}
+aside button{background:none;border:0;color:var(--navtx);text-align:left;padding:10px 12px;border-radius:10px;font-weight:600}
+aside button[aria-current=true]{background:#24335A;color:#fff}
+.sp{flex:1}.who{padding:10px;font-size:14px;color:var(--navtx)}
+main{padding:30px clamp(18px,3.5vw,44px) 60px;max-width:1080px;width:100%}
+.big{font-size:clamp(22px,3vw,30px);line-height:1.2;font-weight:800;margin:10px 0 22px;letter-spacing:-.02em}
+.big .r,h2.red{color:var(--red)}.big .a{color:var(--amber)}
+.stats{display:flex;flex-wrap:wrap;gap:0;margin-bottom:8px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}
+.stats div{flex:1 1 140px;padding:14px 18px;border-right:1px solid var(--line)}.stats div:last-child{border:0}
+.stats b{display:block;font-size:30px;line-height:1.1}.stats span{color:var(--mute);font-size:13.5px}
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:26px}@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.msg{display:flex;gap:12px;background:var(--card);border:1px solid var(--line);border-left:6px solid var(--amber);border-radius:12px;padding:12px;margin-bottom:10px}
+.msg.hi{border-left-color:var(--red)}
+.av{flex:none;width:36px;height:36px;border-radius:50%;color:#fff;font-weight:800;display:grid;place-items:center}
+.bd{flex:1;min-width:0}.top{display:flex;justify-content:space-between;gap:8px;font-size:14px}.top time{color:var(--mute)}
+.msg p{margin:3px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.why span,.tag{display:inline-block;font-size:12.5px;font-weight:600;background:var(--chip);border-radius:6px;padding:2px 8px;margin:0 5px 4px 0}
+.tag.red{background:var(--redbg);color:var(--red)}
+.bar{height:6px;background:var(--chip);border-radius:9px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--brand)}
+.pr{font-size:12.5px;color:var(--mute)}
+.tx.blur{filter:blur(6px);cursor:pointer;user-select:none}.tx.blur.show{filter:none;user-select:auto}
+ul.l{list-style:none;padding:0;margin:0}
+ul.l li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:8px;overflow-wrap:anywhere}
+ul.l li.past{border-color:var(--red);background:var(--redbg)}
+[role=tablist]{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+[role=tab]{padding:7px 14px;border-radius:99px;font-size:14px}
+[role=tab][aria-selected=true]{background:var(--brand);border-color:var(--brand);color:var(--onbrand)}
+.empty{color:var(--mute)}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:700;z-index:9}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:16px;background:var(--bg)}
+</style>
+</head>
+<body>
+
+<div id="auth" class="auth">
+  <section class="pitch" aria-labelledby="pt">
+    <span class="logo">Catchup</span>
+    <h1 id="pt">Your chats, triaged. Never uploaded.</h1>
+    <p>Sign in to a private dashboard that tells you what needs you, what was decided, and which deadlines are close.</p>
+    <ul><li>Everything runs on this device. No server, no tracking.</li><li>Your imported chats are encrypted with your passcode (AES-256-GCM).</li><li>Message text is blurred by default. The raw export is never displayed.</li></ul>
+    <span class="net pill ok" role="status">0 network requests</span>
+  </section>
+  <div class="gate"><div class="box" id="gate"></div></div>
+</div>
+
+<div id="shell" class="shell" hidden>
+  <aside aria-label="Dashboard navigation">
+    <span class="logo">Catchup</span>
+    <button data-v="overview" aria-current="true">Overview</button>
+    <button data-v="chats">Chats</button>
+    <button data-v="import">Import chat</button>
+    <button data-v="deadlines">Deadlines</button>
+    <button data-v="settings">Settings</button>
+    <span class="sp"></span>
+    <span class="net pill ok" role="status">0 network requests</span>
+    <div class="who" id="who"></div>
+    <button id="out">Sign out</button>
+  </aside>
+  <main id="view" aria-live="polite"></main>
+</div>
+<div id="toast" hidden role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+let reqs=0;
+function upd(){$$('.net').forEach(n=>{n.textContent=reqs+' network request'+(reqs===1?'':'s');n.className='net pill '+(reqs?'warn':'ok')})}
+const _f=window.fetch;window.fetch=(...a)=>{reqs++;upd();return _f.apply(window,a)};
+const _o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(...a){reqs++;upd();return _o.apply(this,a)};
+
+/* ---------- 1. parse WhatsApp export ---------- */
+function parse(raw){
+  const re=/^\[?(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap]m)?\]?\s*[-–]?\s*([^:]{1,40}?):\s([\s\S]*)$/i;
+  const out=[];
+  for(const line of raw.replace(/\u200e/g,'').split(/\r?\n/)){
+    const m=line.match(re);
+    if(m){
+      let [,d,mo,y,h,mi,ap,s,t]=m; y=+y<100?2000+ +y:+y; h=+h;
+      if(ap){ap=ap.toLowerCase();if(ap==='pm'&&h<12)h+=12;if(ap==='am'&&h===12)h=0}
+      out.push({sender:s.trim(),date:new Date(y,+mo-1,+d,h,+mi),text:t});
+    }else if(out.length&&line.trim()) out[out.length-1].text+='\n'+line;
+  }
+  return out.filter(m=>!/^(<media omitted>|you deleted|this message was deleted)/i.test(m.text.trim()));
+}
+
+/* ---------- 2. deadline detection (English + Hinglish + Kannada words) ---------- */
+const DAYS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const CUE=/deadline|due\b|submit|before|\bby\b|till|until|last date|meeting|exam|viva|demo|test\b|review|moved|postpone|prepone|reach|bring|report|send|upload|bhej|karna/i;
+function deadline(t,base){
+  if(!CUE.test(t))return null;
+  const s=t.toLowerCase();let d=new Date(base);d.setHours(23,59,0,0);let hit=false;
+  if(/\b(today|tonight|aaj|indu)\b/.test(s))hit=true;
+  else if(/\b(tomorrow|tmrw|kal|naale)\b/.test(s)){d.setDate(d.getDate()+1);hit=true}
+  else if(/\bparso\b/.test(s)){d.setDate(d.getDate()+2);hit=true}
+  else{
+    const wd=DAYS.findIndex(x=>new RegExp('\\b'+x+'\\b|\\b'+x.slice(0,3)+'\\b').test(s));
+    if(wd>=0){d.setDate(d.getDate()+(wd-d.getDay()+7)%7);hit=true}
+    else{
+      const o=s.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+      if(o){d.setDate(+o[1]);if(d<base)d.setMonth(d.getMonth()+1);hit=true}
+    }
+  }
+  const tm=s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
+  if(tm){let h=+tm[1]%12;if(tm[3]==='pm')h+=12;d.setHours(h,+(tm[2]||0),0,0);hit=true}
+  return hit?d:null;
+}
+const rel=h=>h<1?'within the hour':h<24?'in '+Math.round(h)+'h':'in '+Math.round(h/24)+'d';
+
+/* ---------- 3. score every message ---------- */
+function analyze(msgs,me){
+  const names=me.map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const isMe=s=>names.some(n=>s.toLowerCase().includes(n));
+  const nameRe=names.length?new RegExp('(^|[^a-z])@?('+names.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![a-z])','i'):/$^/;
+  const ref=msgs[msgs.length-1].date, items=[], ghosts=[];
+  msgs.forEach((m,i)=>{
+    if(isMe(m.sender))return;
+    const t=m.text,s=t.toLowerCase(),why=[];let sc=0;
+    const mine=nameRe.test(t);
+    if(mine){sc+=4;why.push('mentions you')}
+    if(/\b(urgent|asap|immediately|important|compulsory|mandatory|no extensions?|last date|deadline)\b/.test(s)){sc+=3;why.push('urgent wording')}
+    const dl=deadline(t,m.date);
+    if(dl){const h=(dl-ref)/36e5;if(h<0){sc+=2;why.push('deadline passed')}else{sc+=h<=24?5:h<=72?3:1;why.push('deadline '+rel(h))}}
+    if(t.includes('?')&&mine&&!msgs.slice(i+1).some(x=>isMe(x.sender))){sc+=3;why.push("question you haven't answered")}
+    const decision=/\b(decided|finali[sz]ed|confirmed|final|let['’]?s go with|approved|agreed)\b/.test(s);
+    if(decision){sc+=2;why.push('decision')}
+    if(/\b(please|pls|need to|needs to|must|should|submit|send|bring|upload|prepare|complete|bhej)\b/.test(s)&&(mine||dl)){sc+=2;why.push('task')}
+    const tt=t.trim();
+    if(/^[\W\d_]*$/.test(tt)||/^(ok+|okay|k|lol|haha+|thanks|thank you|yes|no|hmm+|nice)\W*$/i.test(tt))sc-=5;
+    else if(tt.length<12)sc-=1;
+    items.push({m,sc,why,dl,decision});
+    if(/\b(i['’]?ll|i will)\b[^.?!]*\b(send|share|upload|bring|do|check|submit|update|finish)\b/.test(s)&&
+       !msgs.slice(i+1).some(x=>x.sender===m.sender&&/\b(done|sent|shared|uploaded|submitted|finished|completed)\b/i.test(x.text)))ghosts.push(m);
+  });
+  return{items,ghosts,ref,total:msgs.length,people:new Set(msgs.map(m=>m.sender)).size};
+}
+
+const SAMPLE=`08/10/26, 9:05 am - Prof Mehta: Lab record submission moved to Saturday 5pm. No extensions.
+08/10/26, 9:07 am - Ananya: 🙏🙏
+08/10/26, 9:30 am - Rohit: guys canteen at 1?
+08/10/26, 9:31 am - Kiran: lol yes
+08/10/26, 11:12 am - Ananya: I'll share the IoT report draft tonight
+08/10/26, 1:40 pm - Rohit: Hackathon team is finalised: Srujan, Ananya, Kiran. Final.
+08/10/26, 1:41 pm - Kiran: ok
+08/10/26, 3:02 pm - Kiran: kal 10am team meeting at the library, everyone reach on time
+08/10/26, 3:05 pm - Rohit: haha nice
+08/10/26, 5:20 pm - Ananya: lol
+08/10/26, 8:15 pm - Rohit: I'll upload the budget sheet by evening
+09/10/26, 8:40 am - Kiran: @Srujan can you set up the ESP32 demo board before the review?
+09/10/26, 9:10 am - Prof Mehta: Mini project review is on 12th at 2pm. Attendance mandatory.
+09/10/26, 10:25 am - Ananya: Srujan, aaj shaam tak slides bhej do please, I need to compile them tonight
+09/10/26, 11:00 am - Rohit: anyone has last year's question papers?
+09/10/26, 1:15 pm - Kiran: 👍
+09/10/26, 2:50 pm - Rohit: Registration form for the hackathon is due 11th by 11:59pm, Srujan please fill yours
+09/10/26, 4:30 pm - Ananya: Draft sent on drive, check it?
+09/10/26, 5:45 pm - Prof Mehta: Reminder: Saturday 5pm is final. Submit on the portal.`;
+
+
+
+/* ================= helpers ================= */
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=d=>d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+const pl=(n,w)=>n+' '+w+(n===1?'':'s');
+const COL=['#5B3FF2','#C2306B','#0C8A57','#9A5B00','#0E7490','#B4308C'];
+const av=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return `<span class="av" style="background:${COL[h%COL.length]}" aria-hidden="true">${esc((n.trim()[0]||'?').toUpperCase())}</span>`};
+const hide=t=>`<span class="tx ${SET.hide?'blur':''}" ${SET.hide?'tabindex="0" role="button" title="Click to reveal"':''}>${esc(t)}</span>`;
+const toast=t=>{const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)};
+const LS={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch{return false}},del(k){try{localStorage.removeItem(k)}catch{}}};
+
+/* ================= local encryption (Web Crypto) ================= */
+const enc=new TextEncoder(),dec=new TextDecoder();
+const b64=u=>{let s='';for(const x of u)s+=String.fromCharCode(x);return btoa(s)};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function derive(pass,salt){const k=await crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function seal(){if(GUEST||!KEY)return true;const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},KEY,enc.encode(JSON.stringify({SET,CHATS})));return LS.set('cu.blob',JSON.stringify({iv:b64(iv),ct:b64(new Uint8Array(ct))}))}
+async function unseal(key){const o=JSON.parse(LS.get('cu.blob'));return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.ct))))}
+
+/* ================= state ================= */
+let USER=null,KEY=null,GUEST=false,CHATS=[],SET={names:'',budget:8,hide:true},VIEW='overview',OPEN=null,TAB='triage',ARM=null;
+const CACHE=new Map();
+function an(c){
+  const k=c.id+'|'+SET.names;if(CACHE.has(k))return CACHE.get(k);
+  const msgs=parse(c.raw);if(msgs.length<2)return null;
+  const A=analyze(msgs,SET.names.split(','));
+  const rank=A.items.filter(i=>i.sc>=3).sort((a,b)=>b.sc-a.sc),seen=new Set();
+  const dls=A.items.filter(i=>i.dl).sort((a,b)=>a.dl-b.dl).filter(i=>{const q=+i.dl+i.m.sender;if(seen.has(q))return false;seen.add(q);return true});
+  const R={c,A,act:rank.filter(i=>i.sc>=7),know:rank.filter(i=>i.sc<7),skip:A.items.length-rank.length,dls,dec:A.items.filter(i=>i.decision),tasks:A.items.filter(i=>i.why.includes('task')).sort((a,b)=>b.sc-a.sc),up:dls.filter(i=>i.dl>=A.ref).length};
+  CACHE.set(k,R);return R;
+}
+const all=()=>CHATS.map(an).filter(Boolean);
+
+/* ================= components ================= */
+const card=(i,label)=>`<article class="msg ${i.sc>=7?'hi':''}">${av(i.m.sender)}<div class="bd"><div class="top"><b>${esc(i.m.sender)}</b><time>${fmt(i.m.date)}</time></div><p>${hide(i.m.text.slice(0,240))}</p><div class="why">${label?`<span>${esc(label)}</span>`:''}${i.why.map(w=>`<span>${esc(w)}</span>`).join('')}</div><div class="pr">Priority ${i.sc}</div><div class="bar"><i style="width:${Math.min(100,Math.max(6,i.sc*8))}%"></i></div></div></article>`;
+const list=(a,f,e)=>a.length?'<ul class="l">'+a.map(f).join('')+'</ul>':`<p class="empty">${e}</p>`;
+const TABS=[['triage','Triage'],['deadlines','Deadlines'],['decisions','Decisions'],['actions','Action items'],['promises','Unkept promises']];
+function panel(R,t){
+  if(t==='triage'){const lim=SET.budget,a=R.act.slice(0,lim),k=R.know.slice(0,Math.max(0,lim-a.length));
+    return (a.length?`<h2 class="red">Needs you now (${a.length} of ${R.act.length})</h2>`+a.map(i=>card(i)).join(''):'<p class="empty">Nothing urgent.</p>')+(k.length?`<h2>Good to know (${k.length} of ${R.know.length})</h2>`+k.map(i=>card(i)).join(''):'')+`<p class="empty">${R.skip} messages were safe to skip.</p>`}
+  if(t==='deadlines')return list(R.dls,i=>{const p=i.dl<R.A.ref;return `<li class="${p?'past':''}"><span class="tag ${p?'red':''}">${fmt(i.dl)}</span>${p?'<b>Passed while you were away.</b> ':''}${esc(i.m.sender)}: ${hide(i.m.text.slice(0,110))}</li>`},'No deadlines found.');
+  if(t==='decisions')return list(R.dec,i=>`<li><span class="tag">Decision</span><b>${esc(i.m.sender)}</b>, ${fmt(i.m.date)}: ${hide(i.m.text.slice(0,150))}</li>`,'No decisions found.');
+  if(t==='actions')return list(R.tasks,i=>`<li><label style="margin:0;font-weight:500"><input type="checkbox"> <span class="tag ${i.why.includes('mentions you')?'red':''}">${i.why.includes('mentions you')?'For you':'Team'}</span>${hide(i.m.text.slice(0,140))}</label>${i.dl?`<small>Due ${fmt(i.dl)}</small>`:''}</li>`,'No action items found.');
+  return list(R.A.ghosts,m=>`<li><b>${esc(m.sender)}</b> promised: ${hide(m.text.slice(0,130))}<br><small>No follow-up found. Worth a nudge.</small></li>`,'Everyone followed up on their promises.');
+}
+
+/* ================= views ================= */
+function vOverview(){
+  const A=all();
+  if(!A.length)return `<h1>Hello, ${esc(USER.name)}</h1><p class="sub">No chats yet. Import a WhatsApp export, or load the demo chat to see your first digest.</p><div class="row"><button class="pri" data-a="demo">Load demo chat</button><button data-a="nav" data-id="import">Import a chat</button></div>`;
+  const msgs=A.reduce((s,r)=>s+r.A.total,0),act=A.reduce((s,r)=>s+r.act.length,0),up=A.reduce((s,r)=>s+r.up,0);
+  const top=A.flatMap(r=>r.act.map(i=>[i,r.c.name])).sort((a,b)=>b[0].sc-a[0].sc).slice(0,5);
+  const nxt=A.flatMap(r=>r.dls.filter(i=>i.dl>=r.A.ref).map(i=>[i,r.c.name])).sort((a,b)=>a[0].dl-b[0].dl).slice(0,5);
+  return `<h1>Hello, ${esc(USER.name)}</h1>
+  <p class="big"><span class="r">${pl(act,'message')} need${act===1?'s':''} you now</span> across ${pl(A.length,'chat')}, and <span class="a">${pl(up,'deadline')}</span> ${up===1?'is':'are'} ahead.</p>
+  <div class="stats"><div><b>${A.length}</b><span>Chats</span></div><div><b>${msgs}</b><span>Messages scanned</span></div><div><b>${act}</b><span>Need you now</span></div><div><b>${up}</b><span>Deadlines ahead</span></div></div>
+  <div class="cols"><div><h2>Do these first</h2>${top.length?top.map(([i,n])=>card(i,n)).join(''):'<p class="empty">Nothing urgent.</p>'}</div>
+  <div><h2>Next deadlines</h2>${list(nxt,([i,n])=>`<li><span class="tag">${fmt(i.dl)}</span>${hide(i.m.text.slice(0,90))}<br><small>${esc(n)}</small></li>`,'No upcoming deadlines.')}</div></div>`;
+}
+function vChats(){
+  const A=all();
+  return `<h1>Chats</h1><p class="sub">Raw exports are never shown. Only the analysis is.</p>`+(A.length?'<ul class="l" style="margin-top:14px">'+A.map(r=>`<li><b>${esc(r.c.name)}</b> <small>${r.A.total} messages from ${r.A.people} people</small><br><span class="tag red">${r.act.length} need you</span><span class="tag">${r.up} deadlines ahead</span><span class="tag">${r.dec.length} decisions</span><div class="row" style="margin-top:8px"><button class="pri" data-a="open" data-id="${r.c.id}">Open digest</button><button class="danger" data-a="del" data-id="${r.c.id}">${ARM===r.c.id?'Click again to delete':'Delete'}</button></div></li>`).join('')+'</ul>':'<p class="empty">No chats yet.</p><div class="row"><button class="pri" data-a="nav" data-id="import">Import a chat</button></div>');
+}
+function vChat(){
+  const c=CHATS.find(x=>x.id===OPEN),R=c&&an(c);if(!R)return '<p class="empty">Chat not found.</p>';
+  return `<button data-a="nav" data-id="chats">Back to chats</button><h1 style="margin-top:14px">${esc(c.name)}</h1><p class="sub">${R.A.total} messages from ${R.A.people} people, up to ${fmt(R.A.ref)}.</p>
+  <div role="tablist" aria-label="Digest views">${TABS.map(([k,l])=>`<button role="tab" data-a="tab" data-id="${k}" aria-selected="${k===TAB}">${l}</button>`).join('')}</div><div role="tabpanel">${panel(R,TAB)}</div>`;
+}
+function vImport(){
+  return `<h1>Import a chat</h1><p class="sub">In WhatsApp choose Export chat, without media. The text is analyzed, encrypted, and then cleared from this screen.</p>
+  <div class="box" style="margin-top:16px;max-width:620px"><label for="cn">Chat name</label><input id="cn" type="text" placeholder="e.g. Mini project group">
+  <label for="cf">Chat file (.txt)</label><input id="cf" type="file" accept=".txt">
+  <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">Or paste the text (masked, cleared after analysis)</summary><textarea id="cp" aria-label="Paste chat text" autocomplete="off" spellcheck="false"></textarea></details>
+  <div class="row"><button class="pri" data-a="analyze">Analyze and save</button><button data-a="demo">Load demo chat</button></div>
+  <p class="hint">${GUEST?'Guest mode: nothing is saved. Data disappears when you close this tab.':'Saved only on this device, encrypted with your passcode.'}</p></div>`;
+}
+function vDeadlines(){
+  const rows=all().flatMap(r=>r.dls.map(i=>({i,n:r.c.name,p:i.dl<r.A.ref}))).sort((a,b)=>a.i.dl-b.i.dl),g={};
+  rows.forEach(x=>{const k=x.p?'Passed while you were away':x.i.dl.toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'});(g[k]=g[k]||[]).push(x)});
+  return '<h1>Deadlines</h1>'+(rows.length?Object.entries(g).map(([k,a])=>`<h2 class="${k[0]==='P'?'red':''}">${esc(k)}</h2>`+list(a,x=>`<li class="${x.p?'past':''}"><span class="tag ${x.p?'red':''}">${x.i.dl.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span>${esc(x.i.m.sender)}: ${hide(x.i.m.text.slice(0,110))} <small>${esc(x.n)}</small></li>`)).join(''):'<p class="empty">No deadlines found yet.</p>');
+}
+function vSettings(){
+  return `<h1>Settings</h1><div class="box" style="margin-top:16px;max-width:620px">
+  <label for="sn">Your names and nicknames, comma separated</label><input id="sn" type="text" value="${esc(SET.names)}">
+  <label for="sb">Messages shown in the triage list</label><select id="sb">${[[3,'30 seconds (3)'],[8,'2 minutes (8)'],[999,'Everything important']].map(([v,l])=>`<option value="${v}" ${SET.budget===v?'selected':''}>${l}</option>`).join('')}</select>
+  <label style="display:flex;gap:8px;align-items:center"><input id="sh" type="checkbox" ${SET.hide?'checked':''}> Blur message text until I click it</label>
+  <div class="row"><button class="pri" data-a="save">Save settings</button></div></div>
+  <h2>Privacy</h2><div class="box" style="max-width:620px"><p style="margin:0 0 8px">Network requests made by this page: <span class="net pill ok">0 network requests</span></p>
+  <p class="hint" style="margin:0 0 12px">Chats are encrypted with AES-256-GCM. The key is derived from your passcode (PBKDF2, 150,000 rounds) and is never stored. Forgetting the passcode means the data cannot be recovered.</p>
+  <div class="row" style="margin-top:0"><button data-a="signout">Sign out</button><button class="danger" data-a="erase">${ARM==='erase'?'Click again to erase everything':'Erase all data on this device'}</button></div></div>`;
+}
+const VIEWS={overview:vOverview,chats:vChats,chat:vChat,import:vImport,deadlines:vDeadlines,settings:vSettings};
+function go(v,id){VIEW=v;if(v==='chat')OPEN=id;ARM=null;$$('[data-v]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.v===(v==='chat'?'chats':v))));$('#view').innerHTML=VIEWS[v]();upd();window.scrollTo(0,0)}
+
+/* ================= actions ================= */
+async function addChat(name,raw,dest){
+  if(parse(raw).length<2){toast('No messages found. Use a WhatsApp export without media.');return}
+  const c={id:String(Date.now()),name:name||'Imported chat',raw,added:Date.now()};
+  CHATS.push(c);const ok=await seal();
+  if(!ok&&!GUEST)toast('Storage is blocked, so this chat will only last for this tab.');
+  dest?go(dest):go('chat',c.id);
+}
+$('#view').addEventListener('click',async e=>{
+  const x=e.target.closest('.tx.blur');if(x){x.classList.toggle('show');return}
+  const t=e.target.closest('[data-a]');if(!t)return;const a=t.dataset.a,id=t.dataset.id;
+  if(a==='nav')go(id);
+  else if(a==='open'){TAB='triage';go('chat',id)}
+  else if(a==='tab'){TAB=id;go('chat',OPEN)}
+  else if(a==='demo')await addChat('Demo: college project group',SAMPLE,'overview');
+  else if(a==='analyze'){
+    const f=$('#cf').files[0];let raw=f?await f.text():$('#cp').value;
+    await addChat($('#cn').value.trim(),raw);
+  }
+  else if(a==='del'){if(ARM!==id){ARM=id;go('chats');ARM=id;$('#view').innerHTML=vChats();return}CHATS=CHATS.filter(c=>c.id!==id);ARM=null;await seal();toast('Chat deleted');go('chats')}
+  else if(a==='save'){SET.names=$('#sn').value;SET.budget=+$('#sb').value;SET.hide=$('#sh').checked;CACHE.clear();await seal();toast('Settings saved');go('settings')}
+  else if(a==='signout')signOut();
+  else if(a==='erase'){if(ARM!=='erase'){ARM='erase';$('#view').innerHTML=vSettings();return}LS.del('cu.user');LS.del('cu.blob');signOut()}
+});
+$('#view').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.tx.blur'))e.target.classList.toggle('show')});
+$$('[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
+$('#out').onclick=()=>signOut();
+
+/* ================= auth ================= */
+function signOut(){KEY=null;USER=null;CHATS=[];GUEST=false;CACHE.clear();$('#shell').hidden=true;$('#auth').hidden=false;gate()}
+function enter(){$('#auth').hidden=true;$('#shell').hidden=false;$('#who').textContent=(GUEST?'Guest: ':'Signed in as ')+USER.name;go('overview')}
+function gate(){
+  const u=LS.get('cu.user'),has=u&&LS.get('cu.blob');let name='';if(has){try{name=JSON.parse(u).name}catch{}}
+  const canCrypto=!!(window.crypto&&crypto.subtle);
+  $('#gate').innerHTML=`<h1 style="font-size:26px">${has?'Welcome back':'Create your private profile'}</h1>
+  <p class="sub" style="margin:6px 0 4px">${has?`Signed out as <b>${esc(name)}</b>. Enter your passcode to unlock your chats.`:'This profile lives only on this device. There is no server account.'}</p>
+  <form id="af" autocomplete="off">${has?'':'<label for="an">Display name</label><input id="an" type="text" required maxlength="30">'}
+  <label for="ap">Passcode${has?'':' (at least 6 characters)'}</label><input id="ap" type="password" required minlength="6" autocomplete="${has?'current-password':'new-password'}">
+  <p class="err" id="ae" role="alert"></p>
+  <div class="row" style="margin-top:6px"><button class="pri" type="submit" ${canCrypto?'':'disabled'}>${has?'Unlock dashboard':'Create profile'}</button><button type="button" id="guest">Explore with demo data</button></div></form>
+  <p class="hint">${canCrypto?'Demo mode needs no sign-in and saves nothing.':'Encryption needs a secure (https) page. Demo mode still works.'}</p>
+  ${has?'<p class="hint"><a href="#" id="reset">Not you? Reset this device</a></p>':''}`;
+  $('#guest').onclick=()=>{GUEST=true;USER={name:'Guest'};SET={names:'Srujan, Sru',budget:8,hide:true};CHATS=[];enter();$('#view').querySelector('[data-a=demo]')?.click()};
+  if($('#reset'))$('#reset').onclick=e=>{e.preventDefault();LS.del('cu.user');LS.del('cu.blob');gate()};
+  $('#af').onsubmit=async e=>{
+    e.preventDefault();const pass=$('#ap').value,err=$('#ae');err.textContent='';
+    try{
+      if(has){const salt=unb64(JSON.parse(u).salt),key=await derive(pass,salt);
+        let d;try{d=await unseal(key)}catch{err.textContent='Wrong passcode. Try again.';return}
+        KEY=key;USER={name};SET=d.SET;CHATS=d.CHATS;GUEST=false;enter();
+      }else{
+        if(pass.length<6){err.textContent='Use at least 6 characters.';return}
+        const nm=$('#an').value.trim()||'You',salt=crypto.getRandomValues(new Uint8Array(16));
+        KEY=await derive(pass,salt);USER={name:nm};SET={names:nm,budget:8,hide:true};CHATS=[];GUEST=false;
+        if(!(await seal())||!LS.set('cu.user',JSON.stringify({name:nm,salt:b64(salt)}))){err.textContent='Browser storage is blocked. Use demo mode instead.';KEY=null;return}
+        enter();
+      }
+    }catch(x){err.textContent='Something went wrong: '+x.message}
+  };
+}
+gate();
+</script>
+</body>
+</html>
